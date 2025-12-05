@@ -1,0 +1,31 @@
+function sqrt_newton_safe(x, tol_rel=1e-12, tol_abs=0.0):
+    if x < 0: error
+    if x == 0: return 0
+    if isInf(x): return +Inf
+    if isNaN(x): return NaN
+
+    if x >= 1: lo = 1.0; hi = x
+    else:      lo = x;   hi = 1.0
+    y = 0.5*(lo + hi)
+
+    while (hi - lo) > max(tol_abs, tol_rel * hi):
+        zN = 0.5 * (y + x / y)
+
+        // accepter Newton seulement s'il est "bon"
+        good = (zN > lo) and (zN < hi)
+        // optionnel: exiger une vraie contraction (au moins ~25%)
+        good = good and (max(zN - lo, hi - zN) <= 0.75*(hi - lo))
+
+        z = zN if good else 0.5*(lo + hi)
+
+        if z <= x / z:   lo = z
+        else:            hi = z
+
+        y = z
+
+    return 0.5*(lo + hi)
+
+Remarques:
+
+Le test z ≤ x/z évite de calculer z².
+Le “0.75” est un paramètre: s’il est trop permissif, on accepte des pas Newton peu utiles; s’il est trop strict, on bascule trop souvent en bissection. 0.75–0.9 marche bien.

@@ -1,283 +1,211 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
-mysqrt.py — Implémentations "maison" de la racine carrée + tests intégrés.
-- sqrt_newton: méthode de Newton/Babylone (flottants, option complexes)
-- sqrt_bisect: bissection robuste (flottants)
-- isqrt_binary: racine carrée entière (grands entiers)
-Exécution:
-  - Calcul direct:      python mysqrt.py --method newton --x 2
-  - Laisser par défaut: python mysqrt.py -x 2
-  - Tests intégrés:     python mysqrt.py --test
-Sans import de bibliothèque mathématique. Utilise uniquement les opérations de base.
+Racine carrée par Newton "safeguardé" (avec repli bissection).
+- Robuste: on conserve toujours un encadrement [lo, hi] de sqrt(x).
+- Rapide: on accepte les pas de Newton quand ils contractent bien.
+- Sûr numériquement: on compare z <= x/z plutôt que z*z <= x.
+
+Utilisation rapide:
+    python3 sqrt_newton.py 10
+    python3 sqrt_newton.py --test
 """
 
 from __future__ import annotations
-import argparse
+import math
+import random
 import sys
+from typing import Tuple
 
-# --------- Petites utilitaires sans "math" ----------
-def is_nan(x: float) -> bool:
-    # Détecte NaN sans import: NaN != NaN est True en IEEE-754
-    return x != x
- 
-def is_close(a: float, b: float, rel: float = 1e-12, abs_: float = 1e-15) -> bool:
-    # Proche "maison" (type math.isclose) pour les tests
-    diff = a - b
-    if diff < 0:
-        diff = -diff
-    aa = a if a >= 0 else -a
-    bb = b if b >= 0 else -b
-    scale = 1.0
-    if aa > scale:
-        scale = aa
-    if bb > scale:
-        scale = bb
-    tol = abs_
-    reltol = rel * scale
-    if reltol > tol:
-        tol = reltol
-    return diff <= tol
 
-# --------- Implémentations racine carrée ----------
-
-def sqrt_newton(x: float, tol: float = 1e-12, max_iter: int = 100, allow_complex: bool = False):
-    """
-    Racine carrée par Newton/Babylone.
-    - Pas d'import math, uniquement opérations de base.
-    - Convergence rapide pour x >= 0.
-    - allow_complex=True -> retourne un complex pour x < 0 (0 + i*sqrt(|x|)).
-    """
-    # Gestion bool -> cohérent avec int(bool)
-    if isinstance(x, bool):
-        x = 1.0 if x else 0.0
-
-    # Propagation des NaN/Inf
-    if is_nan(x):
-        return x
-    if x == float('inf'):
-        return x
-    if x == float('-inf'):
-        return float('nan')
-
-    # Négatifs
-    if x < 0.0:
-        if allow_complex:
-            r = sqrt_newton(-x, tol=tol, max_iter=max_iter, allow_complex=False)
-            return complex(0.0, r if isinstance(r, float) else float(r))
-        raise ValueError("sqrt_newton: racine carrée d’un nombre négatif (allow_complex=False)")
-
-    # Cas triviaux
+def _handle_special(x: float) -> Tuple[bool, float]:
+    """Traite les cas spéciaux; renvoie (handled, value)."""
+    if math.isnan(x):
+        return True, math.nan
+    if x < 0:
+        raise ValueError("sqrt_newton_safe: x < 0 (pas de racine réelle).")
     if x == 0.0:
-        return 0.0
-    if x == 1.0:
-        return 1.0
+        return True, 0.0
+    if math.isinf(x):
+        # à ce stade x ne peut être que +inf (car x<0 déjà géré)
+        return True, math.inf
+    return False, 0.0
 
-    # Point de départ: évite divisions instables pour 0 < x < 1
-    y = x if x >= 1.0 else 1.0
+
+def sqrt_newton_safe(
+    x: float,
+    tol_rel: float = 1e-12,
+    tol_abs: float = 0.0,
+    max_iter: int = 100,
+    accept_factor: float = 0.90,
+) -> float:
+    """
+    Calcule sqrt(x) avec Newton "safeguardé".
+
+    Invariants:
+      - lo <= sqrt(x) <= hi
+      - mise à jour via test sûr: z <= x/z  <=>  z*z <= x  (si z>0)
+
+    Critère d'arrêt:
+      hi - lo <= max(tol_abs, tol_rel * hi)
+
+    Paramètres:
+      tol_rel: tolérance relative visée (~1e-12 pour des float64)
+      tol_abs: tolérance absolue (laisser 0.0 pour des x d'ordre >= 1)
+      max_iter: garde-fou pour éviter boucles infinies
+      accept_factor: exige une contraction (<= accept_factor * (hi - lo))
+                     pour accepter le pas de Newton (0.9 recommandé).
+
+    Exceptions:
+      ValueError si x < 0.
+    """
+    handled, y = _handle_special(x)
+    if handled:
+        return y
+
+    # Encadrement initial robuste
+    if x >= 1.0:
+        lo, hi = 1.0, x
+    else:  # 0 < x < 1
+        lo, hi = x, 1.0
+
+    # Point de départ positif => pas de division par zéro
+    y = 0.5 * (lo + hi)
 
     for _ in range(max_iter):
-        if y == 0.0:
-            # Sécurité (ne devrait pas arriver avec nos choix)
-            y = 1.0
-        y_next = 0.5 * (y + (x / y))
-        # Critère d'arrêt relatif+absolu
-        dy = y_next - y
-        if dy < 0:
-            dy = -dy
-        scale = y_next if y_next >= 1.0 else 1.0
-        if dy <= tol * scale:
-            return y_next
-        y = y_next
+        # Arrêt si l'intervalle est suffisamment petit
+        if (hi - lo) <= max(tol_abs, tol_rel * hi):
+            return 0.5 * (lo + hi)
 
-    return y  # meilleure approx après max_iter
+        # Proposition de Newton (Heron)
+        zN = 0.5 * (y + x / y)  # y>0 garanti
 
+        # Newton n'est accepté que s'il reste dans [lo, hi] ET contracte assez
+        good = (zN > lo) and (zN < hi)
+        if good:
+            # contraction maximale résiduelle si l'on prenait zN
+            resid = max(zN - lo, hi - zN)
+            good = resid <= accept_factor * (hi - lo)
 
-def sqrt_bisect(x: float, tol: float = 1e-12, max_iter: int = 200):
-    """
-    Racine carrée par bissection, sans overflow:
-    On évite mid*mid en comparant mid <= x/mid quand mid>0.
-    """
-    if isinstance(x, bool):
-        x = 1.0 if x else 0.0
-    if is_nan(x):
-        return x
-    if x == float('inf'):
-        return x
-    if x == float('-inf'):
-        return float('nan')
-    if x < 0.0:
-        raise ValueError("sqrt_bisect: x négatif")
-    if x == 0.0 or x == 1.0:
-        return x
+        z = zN if good else 0.5 * (lo + hi)  # repli bissection si "pas bon"
 
-    lo = 0.0
-    hi = x if x >= 1.0 else 1.0
-
-    for _ in range(max_iter):
-        mid = 0.5 * (lo + hi)
-        # Arrêt sur largeur d’intervalle
-        width = hi - lo
-        if width <= tol * (hi if hi >= 1.0 else 1.0):
-            return mid
-        if mid == 0.0:
-            lo = mid  # continue à avancer
-            continue
-        # Test monotone sans mid*mid: mid^2 <= x  <=>  mid <= x/mid (mid>0)
-        if mid <= (x / mid):
-            lo = mid
+        # Mise à jour d'encadrement par comparaison sûre (évite z*z)
+        if z <= x / z:
+            lo = z
         else:
-            hi = mid
+            hi = z
+
+        y = z  # nouveau point pour l’itération suivante
+
+    # Si on atteint max_iter, on renvoie le milieu (encore valide et précis)
     return 0.5 * (lo + hi)
 
 
-def isqrt_binary(n: int) -> int:
-    """
-    Racine carrée entière: renvoie r = floor(sqrt(n)) pour n >= 0.
-    Fonctionne pour des entiers très grands (arithmétique Python illimitée).
-    """
-    if not isinstance(n, int):
-        raise TypeError("isqrt_binary: n doit être un int")
-    if n < 0:
-        raise ValueError("isqrt_binary: n négatif")
-    if n < 2:
-        return n
-    lo, hi = 1, n // 2 + 1
-    while lo < hi:
-        mid = (lo + hi) // 2
-        sq = mid * mid
-        if sq == n:
-            return mid
-        if sq < n:
-            lo = mid + 1
+# --- Référence pour tests: bissection "pure" (lente mais très sûre) ---
+def sqrt_bisect_ref(x: float, tol_rel: float = 1e-15, tol_abs: float = 0.0) -> float:
+    handled, y = _handle_special(x)
+    if handled:
+        return y
+
+    if x >= 1.0:
+        lo, hi = 1.0, x
+    else:
+        lo, hi = x, 1.0
+
+    while (hi - lo) > max(tol_abs, tol_rel * hi):
+        m = 0.5 * (lo + hi)
+        if m <= x / m:  # test sûr
+            lo = m
         else:
-            hi = mid
-    return lo - 1  # plus grand entier t.q. r^2 <= n
+            hi = m
+    return 0.5 * (lo + hi)
 
 
-# --------- Interface CLI ----------
-def parse_args(argv=None):
-    p = argparse.ArgumentParser(description="Racines carrées maison + tests")
-    p.add_argument("-x", "--x", type=str, help="Valeur pour laquelle calculer la racine (float ou int)")
-    p.add_argument("--method", choices=["newton", "bisect", "isqrt"], default="newton",
-                   help="Méthode de calcul (newton par défaut)")
-    p.add_argument("--tol", type=float, default=1e-12, help="Tolérance relative (flottants)")
-    p.add_argument("--max-iter", type=int, default=100, help="Itérations max (newton/bisect)")
-    p.add_argument("--allow-complex", action="store_true", help="Autoriser les complexes pour x<0 (newton)")
-    p.add_argument("--test", action="store_true", help="Exécuter les tests intégrés et quitter")
-    return p.parse_args(argv)
+# --- Mini banc de tests -------------------------------------------------------
+def _relative_error(a: float, b: float) -> float:
+    if a == b:
+        return 0.0
+    denom = max(1.0, abs(a), abs(b))
+    return abs(a - b) / denom
 
 
-# --------- Tests intégrés (sans unittest/pytest) ----------
-def _residual_ok(y: float, x: float, tol: float) -> bool:
-    # Valide y comme sqrt(x) via résidu: |y^2 - x| petit.
-    # Attention overflow si |y| très grand; ici on utilise des cas de test raisonnables.
-    r = y * y - x
-    if r < 0:
-        r = -r
-    scale = x if x >= 1.0 else 1.0
-    return r <= tol * scale
+def run_tests(verbose: bool = False) -> None:
+    # Cas déterministes
+    cases = [
+        0.0, 1.0, 2.0, 10.0, 1e-12, 1e-6, 1e-3, 0.5, 0.25, 0.1,
+        1e6, 1e12, 1e300,
+        math.inf,  # NaN testé à part (comparaison spéciale)
+    ]
+    for x in cases:
+        y = sqrt_newton_safe(x)
+        y_ref = sqrt_bisect_ref(x)
+        assert y_ref == y_ref  # pas NaN
+        err = _relative_error(y, y_ref)
+        if verbose:
+            print(f"x={x:g}\t y={y:.17g}\t y_ref={y_ref:.17g}\t rel_err={err:.3e}")
+        assert err <= 5e-13, f"Erreur relative trop grande pour x={x}: {err}"
 
-def run_tests(verbose: bool = True) -> int:
-    ok = True
-    def check(cond, msg):
-        nonlocal ok
-        if not cond:
-            ok = False
-            if verbose:
-                print("FAIL:", msg)
-        elif verbose:
-            print("OK  :", msg)
+    # NaN
+    y_nan = sqrt_newton_safe(math.nan)
+    assert math.isnan(y_nan)
 
-    # Cas simples
-    for val in [0.0, 1.0, 4.0, 9.0, 1e-8, 1e-3, 2.0, 3.0, 10.0, 1e6]:
-        y = sqrt_newton(val)
-        check(_residual_ok(y, val, 1e-12), f"sqrt_newton résidu pour x={val}")
+    # Aléatoires (uniformes et log-uniformes)
+    rng = random.Random(1234)
+    for _ in range(200):
+        x = rng.random() * 1e6  # [0, 1e6]
+        y = sqrt_newton_safe(x)
+        y_ref = sqrt_bisect_ref(x)
+        assert _relative_error(y, y_ref) <= 5e-13
 
-    for val in [0.0, 1.0, 4.0, 9.0, 2.0, 3.0, 10.0, 1e6]:
-        y = sqrt_bisect(val)
-        check(_residual_ok(y, val, 1e-12), f"sqrt_bisect résidu pour x={val}")
+    for _ in range(200):
+        # log-uniforme dans [1e-300, 1e300]
+        e = rng.uniform(-300.0, 300.0)
+        x = 10.0 ** e
+        y = sqrt_newton_safe(x)
+        y_ref = sqrt_bisect_ref(x)
+        assert _relative_error(y, y_ref) <= 5e-13
 
-    # Accord entre méthodes
-    for val in [1e-8, 1e-6, 0.5, 2.0, 3.0, 7.5, 123.456, 1e6]:
-        a = sqrt_newton(val, tol=1e-13, max_iter=200)
-        b = sqrt_bisect(val, tol=1e-13, max_iter=400)
-        check(is_close(a, b, rel=1e-12, abs_=1e-14), f"newton≈bisect pour x={val}")
-
-    # Négatifs
+    # Erreur attendue sur négatifs
     try:
-        _ = sqrt_newton(-4.0)
-        check(False, "sqrt_newton(-4) aurait dû lever")
+        sqrt_newton_safe(-1.0)
+        raise AssertionError("Devrait lever ValueError pour x<0.")
     except ValueError:
-        check(True, "sqrt_newton(-4) lève bien ValueError")
-
-    z = sqrt_newton(-4.0, allow_complex=True)
-    check((isinstance(z, complex) and is_close(z.real, 0.0) and is_close(z.imag, 2.0)),
-          "sqrt_newton(-4, complex) == 2i")
-
-    # NaN / Inf
-    nan = float('nan')
-    inf = float('inf')
-    n1 = sqrt_newton(nan); n2 = sqrt_bisect(nan)
-    check(is_nan(n1), "sqrt_newton(NaN) -> NaN")
-    check(is_nan(n2), "sqrt_bisect(NaN) -> NaN")
-
-    check(sqrt_newton(inf) == inf, "sqrt_newton(+inf) -> +inf")
-    check(sqrt_bisect(inf) == inf, "sqrt_bisect(+inf) -> +inf")
-
-    # isqrt_binary
-    ints = [0, 1, 2, 3, 4, 15, 16, 24, 25, 10**12, (10**12)-1]
-    for n in ints:
-        r = isqrt_binary(n)
-        cond = (r * r <= n) and ((r + 1) * (r + 1) > n)
-        check(cond, f"isqrt_binary n={n} -> r={r} OK")
+        pass
 
     if verbose:
-        print("\nRésumé des tests:", "SUCCESS" if ok else "FAIL")
-    return 0 if ok else 1
+        print("Tous les tests ont réussi.")
 
 
-def main(argv=None):
-    args = parse_args(argv)
+# --- Interface CLI simple -----------------------------------------------------
+def _main(argv=None) -> int:
+    import argparse
+
+    p = argparse.ArgumentParser(description="Racine carrée par Newton safeguardé.")
+    p.add_argument("x", type=float, nargs="?", help="valeur non négative dont calculer sqrt(x)")
+    p.add_argument("--tol-rel", type=float, default=1e-12, help="tolérance relative")
+    p.add_argument("--tol-abs", type=float, default=0.0, help="tolérance absolue")
+    p.add_argument("--max-iter", type=int, default=100, help="itérations max")
+    p.add_argument("--accept", type=float, default=0.90, help="seuil de contraction pour accepter Newton")
+    p.add_argument("--test", action="store_true", help="exécute le banc de tests")
+    p.add_argument("--verbose", action="store_true", help="sortie verbeuse (tests)")
+    args = p.parse_args(argv)
 
     if args.test:
-        sys.exit(run_tests(verbose=True))
+        run_tests(verbose=args.verbose)
+        print("OK")
+        return 0
 
     if args.x is None:
-        print("Erreur: Fournis une valeur avec -x/--x (ex: -x 2.0). Ou lance --test pour les tests.")
-        return 2
+        p.error("Veuillez fournir x (ou --test).")
 
-    # Parsing de x selon la méthode
-    if args.method == "isqrt":
-        try:
-            n = int(args.x, 0) if isinstance(args.x, str) else int(args.x)  # supporte '0x...' etc.
-        except Exception:
-            print("Erreur: isqrt attend un entier (ex: --method isqrt -x 123456).")
-            return 2
-        r = isqrt_binary(n)
-        print(r)
-        return 0
-    else:
-        # Méthodes flottantes
-        try:
-            # Autorise "nan", "inf", "-inf"
-            x = float(args.x)
-        except Exception:
-            print("Erreur: newton/bisect attend un flottant (ex: -x 2.5).")
-            return 2
-
-        if args.method == "newton":
-            y = sqrt_newton(x, tol=args.tol, max_iter=args.max_iter, allow_complex=args.allow_complex)
-        else:
-            if x < 0 and args.allow_complex:
-                print("Attention: bisect ne gère pas les complexes. Utilise --method newton --allow-complex.")
-                return 2
-            y = sqrt_bisect(x, tol=args.tol, max_iter=args.max_iter)
-
-        # Affichage compact
-        print(y)
-        return 0
+    y = sqrt_newton_safe(
+        args.x, tol_rel=args.tol_rel, tol_abs=args.tol_abs,
+        max_iter=args.max_iter, accept_factor=args.accept
+    )
+    print(f"sqrt_newton_safe({args.x}) = {y:.17g}")
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(_main())
