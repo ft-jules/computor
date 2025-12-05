@@ -64,4 +64,6 @@ run_test "Toujours Vrai (0 = 0)" "4 * X^0 = 4 * X^0"
 # Attendu : Degré 3, Message d'erreur poli
 run_test "Degré 3 (Trop haut)" "1 * X^3 + 2 * X^0 = 0"
 
+
+
 echo -e "${GREEN}=== FIN DES TESTS ===${RESET}"
