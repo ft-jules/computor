@@ -39,3 +39,27 @@ Gérer la réassignation.
 C'est le boss final. Gérer f(x) = x^2 et f(2) = ?.
 
 Gérer la simplification symbolique (2 * x reste 2 * x si x n'est pas défini).
+
+
+
+BONUS PART:
+
+You are free to add much more advanced features to your program, such as:
+• Function curve display
+• Added usual functions (exponential, square root, absolute value, cosine, sinus, tangent, etc.)
+• Radian computation for angles
+• Function Composition
+$./computorv2
+> funA(x) = 2*x+1
+2 * x + 1
+> funB(x) = 2 * x+1
+2 * x + 1
+> funA(funB(x)) = ?
+4 * x + 3
+>
+• Norm computation
+• Display of the list of stored variables and their values
+• History of commands with results
+• Matrix inversion
+• An extension of the matrix computation applied to the vector computation
+• What you feel is necessary and useful in this project
