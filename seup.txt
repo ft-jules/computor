@@ -1,0 +1,86 @@
+C'est une excellente initiative de vouloir garder une trace précise de ce qui est installé sur ta machine. Voici le **registre complet** de tout ce que les scripts `setup_v1.sh` et `setup_v2.sh` installent.
+
+Tu peux copier cette liste dans un fichier `INSTALL_LOG.md` dans tes projets pour t'en souvenir.
+
+-----
+
+### 📦 1. L'Infrastructure Commune (Base)
+
+Avant même de parler des projets, le script installe l'outil qui gère tout.
+
+| Composant | Description | Emplacement |
+| :--- | :--- | :--- |
+| **Miniconda3** | C'est le gestionnaire d'environnements. Il contient une version de base de Python et les outils `conda`. C'est le "socle". | `~/miniconda3` (Perso)<br>ou `/goinfre/$USER/miniconda3` (École) |
+| **Modif Shell** | Le script ajoute un bloc de code dans ton fichier de config Zsh pour que la commande `conda` soit reconnue. | Fichier `~/.zshrc` |
+
+-----
+
+### 🚀 2. Détail pour ComputorV1 (`setup_v1.sh`)
+
+Cet environnement est conçu pour être **léger**. Il ne contient que le strict nécessaire pour coder proprement en Python pur.
+
+#### 📂 Nom de l'environnement : `computorv1`
+
+**A. Langage & Cœur :**
+
+  * **Python 3.10** : L'interpréteur du langage.
+  * **Pip** : L'outil pour installer les paquets Python.
+  * **Setuptools / Wheel** : Outils internes pour gérer les installations de paquets.
+
+**B. Outils de Qualité (Installés par le script) :**
+
+  * **Black** : Le "formateur" de code. Il réécrit ton code automatiquement pour qu'il soit beau (espaces, indentations).
+      * *Dépendances installées avec :* `click`, `mypy-extensions`, `packaging`, `pathspec`, `platformdirs`.
+  * **Flake8** : Le "policier" du code. Il t'avertit si tu as des variables inutilisées ou des lignes trop longues.
+      * *Dépendances installées avec :* `mccabe`, `pycodestyle`, `pyflakes`.
+
+-----
+
+### 🦖 3. Détail pour ComputorV2 (`setup_v2.sh`)
+
+Cet environnement est **lourd**. Il contient tout ce qu'il faut pour construire, typer et tester un interpréteur complexe.
+
+#### 📂 Nom de l'environnement : `computorv2`
+
+**A. Langage & Cœur :**
+
+  * **Python 3.10** : L'interpréteur.
+  * **Pip, Setuptools, Wheel** : Gestionnaires de paquets.
+
+**B. Outils de Qualité (Linters/Formatters) :**
+
+  * **Black** : Formateur automatique.
+  * **Flake8** : Linter syntaxique.
+
+**C. Outils de Typage (Spécifique V2) :**
+
+  * **Mypy** : Vérificateur de type statique. C'est lui qui va crier si tu essaies d'additionner une `Matrix` avec un `Rational` sans faire exprès.
+      * *Dépendances :* `typing_extensions`.
+
+**D. Outils de Test & Maths (Spécifique V2) :**
+
+  * **Pytest** : Le framework de test standard de l'industrie. Bien plus puissant que le `unittest` de base.
+      * *Dépendances :* `iniconfig`, `pluggy`, `exceptiongroup`, `tomli`.
+  * **Numpy** : La librairie mathématique de référence.
+      * ⚠️ **Rappel :** Elle est installée **uniquement** pour vérifier tes résultats dans le dossier `tests/`. Tu n'as pas le droit de l'importer dans `src/`.
+      * *C'est le paquet le plus lourd (plusieurs dizaines de Mo).*
+
+-----
+
+### 🔍 Comment vérifier toi-même ?
+
+À tout moment, si tu veux voir la liste exacte et à jour de ce qu'il y a dans ton environnement, lance cette commande dans ton terminal :
+
+# 1. Active l'environnement
+conda activate computorv2
+
+# 2. Affiche la liste
+conda list
+
+Tu verras un tableau avec :
+
+  * **Name :** Le nom du paquet (ex: `numpy`).
+  * **Version :** La version installée (ex: `1.26.0`).
+  * **Channel :** D'où il vient (`pypi` signifie qu'il a été installé via pip).
+
+C'est la méthode la plus sûre pour savoir exactement ce qui traîne sur ta machine \!
