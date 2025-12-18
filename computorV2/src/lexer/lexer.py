@@ -27,7 +27,7 @@ class Lexer:
         }
 
     def error(self):
-        raise Exception(f"Invalid character '{self.current_char}' at position {self.pos}")
+        raise ParseError(f"Invalid character '{self.current_char}' at position {self.pos}")
 
     def advance(self):
         self.pos += 1
