@@ -34,37 +34,44 @@ class Rational:
             return f"{self.numerator}"
         return f"{self.numerator}/{self.denominator}"
 
+    def __eq__(self, other):
+        if isinstance(other, (int, float)):
+            other = Rational(other)
+        if not isinstance(other, Rational):
+            return False
+        return self.numerator == other.numerator and self.denominator == other.denominator
+
 # -------------------OPERATIONS ARITHMETIQUES------------------- #
 
-        def __add__(self, other):
-            if isinstance(other, (int, float)):
-                other = Rational(other)
-            new_num = self.numerator * other.denominator + other.numerator * self.denominator
-            new_den = self.denominator * other.denominator
-            return Rational(new_num, new_den)
+    def __add__(self, other):
+        if isinstance(other, (int, float)):
+            other = Rational(other)
+        new_num = self.numerator * other.denominator + other.numerator * self.denominator
+        new_den = self.denominator * other.denominator
+        return Rational(new_num, new_den)
 
-        def __sub__(self, other):
-            if isinstance(other, (int, float)):
-                other = Rational(other)
-            new_num = self.numerator * other.denominator - other.numerator * self.denominator
-            new_den = self.denominator * other.denominator
-            return Rational(new_num, new_den)
+    def __sub__(self, other):
+        if isinstance(other, (int, float)):
+            other = Rational(other)
+        new_num = self.numerator * other.denominator - other.numerator * self.denominator
+        new_den = self.denominator * other.denominator
+        return Rational(new_num, new_den)
 
-        def __mul__(self, other):
-            if isinstance(other, (int, float)):
-                other = Rational(other)
-            return Rational(self.numerator * other.numerator, self.denominator * other.denominator)
+    def __mul__(self, other):
+        if isinstance(other, (int, float)):
+            other = Rational(other)
+        return Rational(self.numerator * other.numerator, self.denominator * other.denominator)
 
-        def __truediv__(self, other):
-            if isinstance(other, (int, float)):
-                other = Rational(other)
-            if other.numerator == 0:
-                raise MathError("Division by zero")
-            return Rational(self.numerator * other.denominator, self.denominator * other.numerator)
+    def __truediv__(self, other):
+        if isinstance(other, (int, float)):
+            other = Rational(other)
+        if other.numerator == 0:
+            raise MathError("Division by zero")
+        return Rational(self.numerator * other.denominator, self.denominator * other.numerator)
 
-        def __pow__(self, power):
-            if not isinstance(power, int):
-                raise MathError("Exponent must be an interger")
-            if power < 0:
-                return Rational(self.denominator, self.numerator) ** -power
-            return Rational(self.numerator ** power, self.denominator ** power)
+    def __pow__(self, power):
+        if not isinstance(power, int):
+            raise MathError("Exponent must be an interger")
+        if power < 0:
+            return Rational(self.denominator, self.numerator) ** -power
+        return Rational(self.numerator ** power, self.denominator ** power)
