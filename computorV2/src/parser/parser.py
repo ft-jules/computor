@@ -7,18 +7,22 @@ from src.utils.errors import ParseError
 from src.core.rational import Rational
 from src.core.complex import Complex
 from src.core.matrix import Matrix
+from src.core.context import Context
 
 class Parser:
-    def __init__(self, lexer):
+    def __init__(self, lexer, context=None):
         self.lexer = lexer
         self.current_token = self.lexer.get_next_token()
+        self.context = context if context else Context()
+        self.next_token = self.lexer.get_next_token()
 
     def error(self):
         raise ParseError("Invalid synthax")
 
     def eat(self, token_type): #compare avec type attendu, avance ou error
         if self.current_token.type == token_type:
-            self.current_token = self.lexer.get_next_token()
+            self.current_token = self.next_token
+            self.next_token = self.lexer.get_next_token()
         else:
             self.error()
 
@@ -42,6 +46,10 @@ class Parser:
 
         if token.type == TokenType.LBRACKET:
             return self.matrix()
+
+        if token.type == TokenType.ID:
+            self.eat(TokenType.ID)
+            return self.context.get_variable(token.value)
         
         self.error()
 
@@ -116,4 +124,11 @@ class Parser:
         return node
 
     def parse(self):
+        if (self.current_token.type == TokenType.ID and self.next_token.type == TokenType.ASSIGN):
+            var_name = self.current_token.value
+            self.eat(TokenType.ID)
+            self.eat(TokenType.ASSIGN)
+            val = self.expr()
+            self.context.set_variable(var_name, val)
+            return val
         return self.expr()
