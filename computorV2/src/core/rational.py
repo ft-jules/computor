@@ -46,6 +46,8 @@ class Rational:
     def __add__(self, other):
         if isinstance(other, (int, float)):
             other = Rational(other)
+        if not isinstance(other, Rational):
+            return NotImplemented
         new_num = self.numerator * other.denominator + other.numerator * self.denominator
         new_den = self.denominator * other.denominator
         return Rational(new_num, new_den)
@@ -53,6 +55,8 @@ class Rational:
     def __sub__(self, other):
         if isinstance(other, (int, float)):
             other = Rational(other)
+        if not isinstance(other, Rational):
+            return NotImplemented
         new_num = self.numerator * other.denominator - other.numerator * self.denominator
         new_den = self.denominator * other.denominator
         return Rational(new_num, new_den)
@@ -60,11 +64,15 @@ class Rational:
     def __mul__(self, other):
         if isinstance(other, (int, float)):
             other = Rational(other)
+        if not isinstance(other, Rational):
+            return NotImplemented
         return Rational(self.numerator * other.numerator, self.denominator * other.denominator)
 
     def __truediv__(self, other):
         if isinstance(other, (int, float)):
             other = Rational(other)
+        if not isinstance(other, Rational):
+            return NotImplemented
         if other.numerator == 0:
             raise MathError("Division by zero")
         return Rational(self.numerator * other.denominator, self.denominator * other.numerator)
@@ -75,3 +83,19 @@ class Rational:
         if power < 0:
             return Rational(self.denominator, self.numerator) ** -power
         return Rational(self.numerator ** power, self.denominator ** power)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __rsub__(self, other):
+        if isinstance(other, int):
+            other = Rational(other)
+        return other - self 
+
+    def __rtruediv__(self, other):
+        if isinstance(other, int):
+            other = Rational(other)
+        return other / self

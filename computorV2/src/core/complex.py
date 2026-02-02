@@ -45,16 +45,22 @@ class Complex:
 # -------------------OPERATIONS ARITHMETIQUES------------------- #
 
     def __add__(self, other):
+        if not isinstance(other, (int, float, Rational, Complex)):
+            return NotImplemented
         if not isinstance(other, Complex):
             other = Complex(other)
         return Complex(self.real + other.real, self.imaginary + other.imaginary)
 
     def __sub__(self, other):
+        if not isinstance(other, (int, float, Rational, Complex)):
+            return NotImplemented
         if not isinstance(other, Conplex):
             other = Complex(other)
         return Complex(self.real - other.real, self.imaginary - other.imaginary)
 
     def __mul__(self, other):
+        if not isinstance(other, (int, float, Rational, Complex)):
+            return NotImplemented
         if not isinstance(other, Complex):
             other = Complex(other)
         real_part = (self.real * other.real) - (self.imaginary * other.imaginary)
@@ -62,6 +68,8 @@ class Complex:
         return Complex(real_part, imag_part)
 
     def __truediv__(self, other):
+        if not isinstance(other, (int, float, Rational, Complex)):
+            return NotImplemented
         if not isinstance(other, Complex):
             other = Complex(other)
         if other.real.numerator == 0 and other.imaginary.numerator == 0:
@@ -84,3 +92,15 @@ class Complex:
         for _ in range(power):
             result = result * base
         return result
+
+    def __radd__(self, other):
+        return self + other
+
+    def __rmul__(self, other):
+        return self * other
+
+    def __rsub__(self, other):
+        return Complex(other) - self
+
+    def __rtruediv__(self, other):
+        return Complex(other) / self

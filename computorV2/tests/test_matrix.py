@@ -61,5 +61,14 @@ class TestMatrix(unittest.TestCase):
         with self.assertRaises(MathError):
             m1 * m2
 
+    def test_reverse_scalar_mul(self):
+        # Test de Rational * Matrix
+        m = Matrix([[1, 2], [3, 4]])
+        # On multiplie par 2 (qui sera un int ou un Rational selon le contexte)
+        res = 2 * m 
+        
+        self.assertEqual(str(res.data[0][0]), "2")
+        self.assertEqual(str(res.data[1][1]), "8")
+
 if __name__ == '__main__':
     unittest.main()
