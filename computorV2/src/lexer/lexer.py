@@ -42,6 +42,19 @@ class Lexer:
             return self.text[peek_pos]
         return None
 
+    def peek_token(self, offset=1):
+        saved_pos = self.pos
+        saved_char = self.current_char
+        token = None
+        for _ in range(offset):
+            token = self.get_next_token()
+            if token.type == TokenType.EOF:
+                break
+        self.pos = saved_pos
+        self.current_char = saved_char
+        
+        return token
+
     def skip_whitespace(self):
         while self.current_char is not None and self.current_char.isspace():
             self.advance()

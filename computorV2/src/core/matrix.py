@@ -33,7 +33,7 @@ class Matrix:
         return f"[{', '.join(row_str)}]"
 
     def __eq__(self, other):
-        if not isistance(other, Matrix):
+        if not isinstance(other, Matrix):
             return False
         if self.rows != other.rows or self.cols != other.cols:
             return False
@@ -79,7 +79,7 @@ class Matrix:
         if isinstance(other, (int, float, Complex)):
             scalar = other if isinstance(other, Complex) else Complex(other)
             new_data = []
-            for i in range(self.cols):
+            for i in range(self.rows):
                 new_row = []
                 for j in range(self.cols):
                     new_row.append(self.data[i][j] * scalar)
@@ -99,7 +99,7 @@ class Matrix:
                     new_row.append(sum_val)
                 result_data.append(new_row)
             return Matrix(result_data)
-        raise MathError("Unsupported operation for Natrix multiplication")  
+        raise MathError("Unsupported operation for Matrix multiplication")  
 
     def __rmul__(self, other): # gere le cas nombre * matrice
         return self.__mul__(other)

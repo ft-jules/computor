@@ -1,30 +1,78 @@
 """
 Analyse la liste de tokens et construit l'AST (Abstract Syntax Tree).
 """
-
+import copy
 from src.lexer.tokens import TokenType
+from src.lexer.list_lexer import ListLexer
 from src.utils.errors import ParseError
 from src.core.rational import Rational
 from src.core.complex import Complex
 from src.core.matrix import Matrix
 from src.core.context import Context
+from src.core.function import Function
 
 class Parser:
     def __init__(self, lexer, context=None):
         self.lexer = lexer
-        self.current_token = self.lexer.get_next_token()
         self.context = context if context else Context()
-        self.next_token = self.lexer.get_next_token()
-
-    def error(self):
-        raise ParseError("Invalid synthax")
+        self.current_token = self.lexer.get_next_token()
 
     def eat(self, token_type): #compare avec type attendu, avance ou error
         if self.current_token.type == token_type:
-            self.current_token = self.next_token
-            self.next_token = self.lexer.get_next_token()
+            self.current_token = self.lexer.get_next_token()
         else:
-            self.error()
+            raise ParseError(f"Expected {token_type}, got {self.current_token.type}")
+
+    def parse(self):
+        #Assignation de variable
+        if (self.current_token.type == TokenType.ID and self.lexer.peek_token(1).type == TokenType.ASSIGN):
+            return self.assignment()
+
+        #Definition de fonction
+        if (self.current_token.type == TokenType.ID and
+            self.lexer.peek_token(1).type == TokenType.LPAREN and
+            self.lexer.peek_token(2).type == TokenType.ID and
+            self.lexer.peek_token(3).type == TokenType.RPAREN and
+            self.lexer.peek_token(4).type == TokenType.ASSIGN):
+            return self.definition()
+    
+        return self.expr()
+
+    #ACTIONS
+
+    def assignment(self):
+        var_name = self.current_token.value
+        self.eat(TokenType.ID)
+        self.eat(TokenType.ASSIGN)
+        val = self.expr()
+        self.context.set_variable(var_name, val)
+        return val
+
+    def definition(self):
+        func_name = self.current_token.value
+        self.eat(TokenType.ID)         # f
+        self.eat(TokenType.LPAREN)     # (
+        param_name = self.current_token.value
+        self.eat(TokenType.ID) # x
+        self.eat(TokenType.RPAREN)     # )
+        self.eat(TokenType.ASSIGN)     # =
+
+        body_tokens = []
+        while self.current_token.type != TokenType.EOF and self.current_token.type != TokenType.SEMICOLON:
+            body_tokens.append(self.current_token)
+            self.eat(self.current_token.type)
+
+        func = Function(func_name, param_name, body_tokens)
+        self.context.set_function(func_name, func)
+        return func
+
+    def resolve_function_call(self, func_obj, arg_value):
+        local_context = copy.deepcopy(self.context)
+        local_context.set_variable(func_obj.param_name, arg_value)
+        
+        list_lexer = ListLexer(func_obj.body_tokens)
+        sub_parser = Parser(list_lexer, local_context)
+        return sub_parser.expr()
 
     # NIVEAU 1 : Nombres, Parentheses
     def factor(self):
@@ -48,10 +96,20 @@ class Parser:
             return self.matrix()
 
         if token.type == TokenType.ID:
+            name = token.value
+            if self.lexer.peek_token(1).type == TokenType.LPAREN:
+                self.eat(TokenType.ID)
+                self.eat(TokenType.LPAREN)
+                arg_value = self.expr()
+                self.eat(TokenType.RPAREN)
+
+                fun_obj = self.context.get_function(name)
+                if not fun_obj:
+                    raise ParseError(f"Unknown function '{name}'")
+                return self.resolve_function_call(fun_obj, arg_value)
             self.eat(TokenType.ID)
-            return self.context.get_variable(token.value)
-        
-        self.error()
+            return self.context.get_variable(name)
+        raise ParseError(f"Unexpected token: {token}")
 
     # GESTION DES MATRICES
     def matrix(self):
@@ -122,13 +180,3 @@ class Parser:
                 self.eat(TokenType.MINUS)
                 node = node - self.term()
         return node
-
-    def parse(self):
-        if (self.current_token.type == TokenType.ID and self.next_token.type == TokenType.ASSIGN):
-            var_name = self.current_token.value
-            self.eat(TokenType.ID)
-            self.eat(TokenType.ASSIGN)
-            val = self.expr()
-            self.context.set_variable(var_name, val)
-            return val
-        return self.expr()

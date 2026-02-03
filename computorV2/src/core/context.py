@@ -13,3 +13,11 @@ class Context:
         if name in self.variables:
             return self.variables[name]
         raise MathError(f"Unknown variable '{name}'")
+
+    def set_function(self, name, func_obj):
+        self.functions[name] = func_obj
+
+    def get_function(self, name):
+        if name in self.functions:
+            return self.functions[name]
+        return None
