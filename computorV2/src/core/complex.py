@@ -54,7 +54,7 @@ class Complex:
     def __sub__(self, other):
         if not isinstance(other, (int, float, Rational, Complex)):
             return NotImplemented
-        if not isinstance(other, Conplex):
+        if not isinstance(other, Complex):
             other = Complex(other)
         return Complex(self.real - other.real, self.imaginary - other.imaginary)
 
@@ -104,3 +104,17 @@ class Complex:
 
     def __rtruediv__(self, other):
         return Complex(other) / self
+
+    def sqrt(self):
+        if self.imaginary.numerator == 0 and self.real.numerator >= 0:
+            val = self.real.numerator / self.real.denominator
+            root = val ** 0.5
+            return Complex(root, 0)
+        if self.imaginary.numerator == 0 and self.real.numerator < 0:
+            val = abs(self.real.numerator / self.real.denominator)
+            root = val ** 0.5
+            return Complex(0, root)
+        c_val = complex(self.real.numerator/self.real.denominator, 
+                        self.imaginary.numerator/self.imaginary.denominator)
+        res = c_val ** 0.5
+        return Complex(res.real, res.imag)
